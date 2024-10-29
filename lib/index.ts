@@ -78,7 +78,7 @@ export class SyncMessagePort extends EventEmitter {
     if (!buffer) {
       throw new Error(
         'new SyncMessagePort() must be passed a port from ' +
-          'SyncMessagePort.createChannel().'
+          'SyncMessagePort.createChannel().',
       );
     }
     this.buffer = new Int32Array(buffer as SharedArrayBuffer);
@@ -87,7 +87,7 @@ export class SyncMessagePort extends EventEmitter {
       this.port.on(event, listener);
     });
     this.on('removeListener', (event, listener) =>
-      this.port.removeListener(event, listener)
+      this.port.removeListener(event, listener),
     );
   }
 
@@ -103,7 +103,7 @@ export class SyncMessagePort extends EventEmitter {
         this.buffer,
         0,
         BufferState.AwaitingMessage,
-        BufferState.MessageSent
+        BufferState.MessageSent,
       ) === BufferState.AwaitingMessage
     ) {
       Atomics.notify(this.buffer, 0);
@@ -127,7 +127,7 @@ export class SyncMessagePort extends EventEmitter {
     if (this.listenerCount('message')) {
       throw new Error(
         'SyncMessageChannel.receiveMessage() may not be called while there ' +
-          'are message listeners.'
+          'are message listeners.',
       );
     }
 
@@ -141,7 +141,7 @@ export class SyncMessagePort extends EventEmitter {
         this.buffer,
         0,
         BufferState.MessageSent,
-        BufferState.AwaitingMessage
+        BufferState.AwaitingMessage,
       ) === BufferState.Closed
     ) {
       throw new Error("The SyncMessagePort's channel is closed.");
