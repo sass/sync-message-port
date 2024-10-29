@@ -7,7 +7,7 @@ traditionally only available asynchronously in the Node.js ecosystem by running
 the asynchronous APIs in a worker and accessing their results synchronously from
 the main thread.
 
-See [the `sync-process` package] for an example of `sync-message-channel` in
+See [the `sync-process` package] for an example of `sync-message-port` in
 action.
 
 [the `sync-process` package]: https://github.com/sass/sync-process
@@ -31,7 +31,7 @@ action.
 
 ```js
 import {Worker} from 'node:worker_threads';
-import {SyncMessagePort} from 'sync-message-channel';
+import {SyncMessagePort} from 'sync-message-port;
 // or
 // const {SyncMessagePort} = require('sync-message-port');
 
@@ -42,7 +42,7 @@ const localPort = new SyncMessagePort(channel.port1);
 
 const worker = new Worker(`
   import {workerData} = require('node:worker_threads');
-  import {SyncMessagePort} from 'sync-message-channel';
+  import {SyncMessagePort} from 'sync-message-port';
 
   const remotePort = new SyncMessagePort(workerData.port);
 

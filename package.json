@@ -1,8 +1,8 @@
 {
-  "name": "sync-message-channel",
+  "name": "sync-message-port",
   "version": "1.0.0",
   "description": "A Node.js communication port that can pass messages synchronously between workers",
-  "repository": "sass/sync-message-channel",
+  "repository": "sass/sync-message-port",
   "author": "Google Inc.",
   "license": "MIT",
   "exports": {
