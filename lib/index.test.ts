@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as p from 'path';
 import {MessagePort, Worker} from 'worker_threads';
 
-import {SyncMessagePort} from './sync-message-port';
+import {SyncMessagePort} from './index';
 
 describe('SyncMessagePort', () => {
   describe('sends a message', () => {
@@ -152,7 +152,7 @@ function spawnWorker(source: string, port: MessagePort): Worker {
     file,
     `
     const {SyncMessagePort} = require(${JSON.stringify(
-      p.join(p.dirname(__filename), 'sync-message-port')
+      p.join(p.dirname(__filename), 'index')
     )});
     const {workerData} = require('worker_threads');
 
