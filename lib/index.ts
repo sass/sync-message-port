@@ -11,8 +11,6 @@ import {
   receiveMessageOnPort,
 } from 'worker_threads';
 
-// TODO(nex3): Make this its own package.
-
 /**
  * An enum of possible states for the shared buffer that two `SyncMessagePort`s
  * use to communicate.
