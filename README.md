@@ -15,7 +15,7 @@ action.
 ## Usage
 
 1. Use `SyncMessagePort.createChanenl()` to create a message channel that's set
-   up to be compatible iwth `SyncMessagePort`s. A normal `MessageChannel` won't
+   up to be compatible with `SyncMessagePort`s. A normal `MessageChannel` won't
    work!
 
 2. You can send this `MessageChannel`'s ports across worker boundaries just like
