@@ -73,6 +73,60 @@ describe('SyncMessagePort', () => {
     });
   });
 
+  describe('receiveMessageIfAvailable()', () => {
+    it('without a queued message', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+      expect(port.receiveMessageIfAvailable()).toBe(undefined);
+      port.close();
+    });
+
+    it('with a queued message', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port1 = new SyncMessagePort(channel.port1);
+      const port2 = new SyncMessagePort(channel.port2);
+
+      port1.postMessage('done!');
+      expect(port2.receiveMessageIfAvailable()?.message).toBe('done!');
+      port1.close();
+    });
+
+    it('on a closed channel', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port1 = new SyncMessagePort(channel.port1);
+      const port2 = new SyncMessagePort(channel.port2);
+
+      port1.close();
+      expect(port2.receiveMessageIfAvailable()).toBe(undefined);
+    });
+
+    it('bewteen receiving blocking messages', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+
+      spawnWorker(
+        `
+        // Wait a little bit just to make entirely sure that the parent thread
+        // is awaiting a message.
+        setTimeout(() => {
+          port.postMessage('first');
+          port.postMessage('second');
+
+          setTimeout(() => {
+            port.postMessage('third');
+            port.close();
+          }, 100);
+        }, 100);
+      `,
+        channel.port2,
+      );
+
+      expect(port.receiveMessage()).toEqual('first');
+      expect(port.receiveMessageIfAvailable()?.message).toEqual('second');
+      expect(port.receiveMessage()).toEqual('third');
+    });
+  });
+
   describe('with an asynchronous listener', () => {
     it('receives a message sent before listening', async () => {
       const channel = SyncMessagePort.createChannel();

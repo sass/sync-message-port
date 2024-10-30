@@ -110,8 +110,28 @@ export class SyncMessagePort extends EventEmitter {
     }
   }
 
+  /**
+   * Returns the message sent by the other port, if one is available. This *does
+   * not* block, and will return `undefined` immediately if no message is
+   * available. In order to distinguish between a message with value `undefined`
+   * and no message, a message is return in an object with a `message` field.
+   *
+   * This may not be called while this has a listener for the `'message'` event.
+   * It does *not* throw an error if the port is closed when this is called;
+   * instead, it just returns `undefined`.
+   */
+  receiveMessageIfAvailable(): {message: unknown} | undefined {
+    if (this.listenerCount('message')) {
+      throw new Error(
+        'SyncMessageChannel.receiveMessageIfAvailable() may not be called ' +
+          'while there are message listeners.',
+      );
+    }
+
+    return receiveMessageOnPort(this.port);
+  }
+
   // TODO(nex3):
-  // * Add a non-blocking `receiveMessage()`
   // * Add a timeout option to `receiveMessage()`
   // * Add an option to `receiveMessage()` to return a special value if the
   //   channel is closed.
