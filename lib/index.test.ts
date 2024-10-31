@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as p from 'path';
 import {MessagePort, Worker} from 'worker_threads';
 
-import {SyncMessagePort} from './index';
+import {SyncMessagePort, TimeoutException} from './index';
 
 describe('SyncMessagePort', () => {
   describe('sends a message', () => {
@@ -124,6 +124,70 @@ describe('SyncMessagePort', () => {
       expect(port.receiveMessage()).toEqual('first');
       expect(port.receiveMessageIfAvailable()?.message).toEqual('second');
       expect(port.receiveMessage()).toEqual('third');
+    });
+  });
+
+  describe('timeout', () => {
+    it("returns a value if it's already available", () => {
+      const channel = SyncMessagePort.createChannel();
+      const port1 = new SyncMessagePort(channel.port1);
+      const port2 = new SyncMessagePort(channel.port2);
+      port1.postMessage('message');
+      expect(port2.receiveMessage({timeout: 0})).toBe('message');
+    });
+
+    it('returns a value if it becomes available before the timeout', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+
+      spawnWorker(
+        `
+          port.postMessage('ready');
+          setTimeout(() => {
+            port.postMessage('message');
+            port.close();
+          }, 100);
+        `,
+        channel.port2,
+      );
+
+      expect(port.receiveMessage()).toEqual('ready');
+      expect(port.receiveMessage({timeout: 200})).toEqual('message');
+    });
+
+    it('throws an error if it times out before a value is available', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+      expect(() => port.receiveMessage({timeout: 0})).toThrow(TimeoutException);
+    });
+
+    it('returns timeoutValue if it times out before a value is available', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+      expect(port.receiveMessage({timeout: 0, timeoutValue: 'timed out'})).toBe(
+        'timed out',
+      );
+    });
+
+    it('throws an error if the channel closes before the request times out', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+
+      spawnWorker(
+        `
+          port.postMessage('ready');
+          setTimeout(() => {
+            port.close();
+          }, 100);
+        `,
+        channel.port2,
+      );
+
+      expect(port.receiveMessage()).toEqual('ready');
+      // timeoutValue shouldn't take precedence over this error
+      expect(() =>
+        port.receiveMessage({timeout: 10000, timeoutValue: 'timed out'}),
+      ).toThrow();
     });
   });
 

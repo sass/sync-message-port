@@ -8,6 +8,7 @@ import {
   MessageChannel,
   MessagePort,
   TransferListItem,
+  Worker,
   receiveMessageOnPort,
 } from 'worker_threads';
 
@@ -34,6 +35,33 @@ enum BufferState {
    * other states once closed.
    */
   Closed = 0b10,
+}
+
+/**
+ * Options that can be passed to {@link SyncMessagePort.receiveMessage}.
+ */
+export interface ReceiveMessageOptions {
+  /**
+   * The time (in milliseconds) to wait for a message before returning {@link
+   * timeoutValue} (if set) or throwing a [TimeoutException] otherwise.
+   */
+  timeout?: number;
+
+  /**
+   * If a message isn't received within {@link timeout} milliseconds, this value
+   * is returned. Ignored if {@link timeout} is not set.
+   */
+  timeoutValue?: unknown;
+}
+
+/**
+ * An exception thrown by {@link SyncMessagePort.receiveMessage} if a message
+ * isn't received within {@link ReceivedMessageOptions.timeout} milliseconds.
+ */
+export class TimeoutException extends Error {
+  constructor(message: string) {
+    super(message);
+  }
 }
 
 /**
@@ -132,7 +160,6 @@ export class SyncMessagePort extends EventEmitter {
   }
 
   // TODO(nex3):
-  // * Add a timeout option to `receiveMessage()`
   // * Add an option to `receiveMessage()` to return a special value if the
   //   channel is closed.
 
@@ -143,7 +170,7 @@ export class SyncMessagePort extends EventEmitter {
    * Throws an error if the channel is closed, including if it closes while this
    * is waiting for a message.
    */
-  receiveMessage(): unknown {
+  receiveMessage(options?: ReceiveMessageOptions): unknown {
     if (this.listenerCount('message')) {
       throw new Error(
         'SyncMessageChannel.receiveMessage() may not be called while there ' +
@@ -156,14 +183,13 @@ export class SyncMessagePort extends EventEmitter {
     // `receiveMessageOnPort` and the call to `Atomics.wait()`, we won't
     // overwrite it. Use `Atomics.compareExchange` so that we don't overwrite
     // the "closed" state.
-    if (
-      Atomics.compareExchange(
-        this.buffer,
-        0,
-        BufferState.MessageSent,
-        BufferState.AwaitingMessage,
-      ) === BufferState.Closed
-    ) {
+    const previousState = Atomics.compareExchange(
+      this.buffer,
+      0,
+      BufferState.MessageSent,
+      BufferState.AwaitingMessage,
+    );
+    if (previousState === BufferState.Closed) {
       throw new Error("The SyncMessagePort's channel is closed.");
     }
 
@@ -173,9 +199,19 @@ export class SyncMessagePort extends EventEmitter {
     // If there's no new message, wait for the other port to flip the "new
     // message" indicator to 1. If it's been set to 1 since we stored 0, this
     // will terminate immediately.
-    Atomics.wait(this.buffer, 0, BufferState.AwaitingMessage);
+    const result = Atomics.wait(
+      this.buffer,
+      0,
+      BufferState.AwaitingMessage,
+      options?.timeout,
+    );
     message = receiveMessageOnPort(this.port);
     if (message) return message.message;
+
+    if (result === 'timed-out') {
+      if ('timeoutValue' in options!) return options.timeoutValue;
+      throw new TimeoutException('SyncMessagePort.receiveMessage() timed out.');
+    }
 
     // Update the state to 0b10 after the last message is consumed.
     const oldState = Atomics.and(this.buffer, 0, BufferState.Closed);
@@ -187,6 +223,7 @@ export class SyncMessagePort extends EventEmitter {
   /** See `MessagePort.close()`. */
   close(): void {
     Atomics.or(this.buffer, 0, BufferState.Closed);
+    Atomics.notify(this.buffer, 0);
     this.port.close();
   }
 }
