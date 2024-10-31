@@ -7,10 +7,10 @@ traditionally only available asynchronously in the Node.js ecosystem by running
 the asynchronous APIs in a worker and accessing their results synchronously from
 the main thread.
 
-See [the `sync-process` package] for an example of `sync-message-port` in
+See [the `sync-child-process` package] for an example of `sync-message-port` in
 action.
 
-[the `sync-process` package]: https://github.com/sass/sync-process
+[the `sync-child-process` package]: https://github.com/sass/sync-child-process
 
 ## Usage
 
