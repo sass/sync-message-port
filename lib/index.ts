@@ -52,6 +52,13 @@ export interface ReceiveMessageOptions {
    * is returned. Ignored if {@link timeout} is not set.
    */
   timeoutValue?: unknown;
+
+  /**
+   * If the underlying channel is closed before calling {@link
+   * SyncMessagePort.receiveMessage} or while a call is pending, return this
+   * value.
+   */
+  closedValue?: unknown;
 }
 
 /**
@@ -159,16 +166,13 @@ export class SyncMessagePort extends EventEmitter {
     return receiveMessageOnPort(this.port);
   }
 
-  // TODO(nex3):
-  // * Add an option to `receiveMessage()` to return a special value if the
-  //   channel is closed.
-
   /**
    * Blocks and returns the next message sent by the other port.
    *
    * This may not be called while this has a listener for the `'message'` event.
    * Throws an error if the channel is closed, including if it closes while this
-   * is waiting for a message.
+   * is waiting for a message, unless {@link ReceiveMessageOptions.closedValue}
+   * is passed.
    */
   receiveMessage(options?: ReceiveMessageOptions): unknown {
     if (this.listenerCount('message')) {
@@ -190,6 +194,7 @@ export class SyncMessagePort extends EventEmitter {
       BufferState.AwaitingMessage,
     );
     if (previousState === BufferState.Closed) {
+      if (options && 'closedValue' in options) return options.closedValue;
       throw new Error("The SyncMessagePort's channel is closed.");
     }
 
@@ -217,6 +222,7 @@ export class SyncMessagePort extends EventEmitter {
     const oldState = Atomics.and(this.buffer, 0, BufferState.Closed);
     // Assert the old state was either 0b10 or 0b11.
     assert.equal(oldState & BufferState.Closed, BufferState.Closed);
+    if (options && 'closedValue' in options) return options.closedValue;
     throw new Error("The SyncMessagePort's channel is closed.");
   }
 

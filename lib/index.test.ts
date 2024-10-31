@@ -245,7 +245,7 @@ describe('SyncMessagePort', () => {
       await new Promise(resolve => port2.once('close', resolve));
     });
 
-    it('receiveMessage() throws an error for a closed port', () => {
+    it("receiveMessage() throws an error for a port that's already closed", () => {
       const channel = SyncMessagePort.createChannel();
       const port1 = new SyncMessagePort(channel.port1);
       const port2 = new SyncMessagePort(channel.port2);
@@ -253,6 +253,52 @@ describe('SyncMessagePort', () => {
       port1.close();
       expect(port1.receiveMessage).toThrow();
       expect(port2.receiveMessage).toThrow();
+    });
+
+    it('receiveMessage() throws an error when a port closes', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+
+      spawnWorker(
+        `
+          setTimeout(() => {
+            port.close();
+          }, 100);
+        `,
+        channel.port2,
+      );
+
+      expect(port.receiveMessage).toThrow();
+    });
+
+    it(
+      "receiveMessage() returns option.closedValue for a port that's " +
+        'already closed',
+      () => {
+        const channel = SyncMessagePort.createChannel();
+        const port1 = new SyncMessagePort(channel.port1);
+        const port2 = new SyncMessagePort(channel.port2);
+
+        port1.close();
+        expect(port1.receiveMessage({closedValue: 'closed'})).toBe('closed');
+        expect(port2.receiveMessage({closedValue: 'closed'})).toBe('closed');
+      },
+    );
+
+    it('receiveMessage() throws an error when a port closes', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+
+      spawnWorker(
+        `
+          setTimeout(() => {
+            port.close();
+          }, 100);
+        `,
+        channel.port2,
+      );
+
+      expect(port.receiveMessage({closedValue: 'closed'})).toBe('closed');
     });
   });
 });
