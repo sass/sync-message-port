@@ -8,7 +8,6 @@ import {
   MessageChannel,
   MessagePort,
   TransferListItem,
-  Worker,
   receiveMessageOnPort,
 } from 'worker_threads';
 
