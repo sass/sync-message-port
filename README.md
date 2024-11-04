@@ -12,22 +12,31 @@ action.
 
 [the `sync-child-process` package]: https://github.com/sass/sync-child-process
 
+[**API Docs**]
+
+[**API Docs**]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html
+
 ## Usage
 
-1. Use `SyncMessagePort.createChanenl()` to create a message channel that's set
-   up to be compatible with `SyncMessagePort`s. A normal `MessageChannel` won't
-   work!
+1. Use [`SyncMessagePort.createChannel()`] to create a message channel that's
+   set up to be compatible with `SyncMessagePort`s. A normal `MessageChannel`
+   won't work!
 
 2. You can send this `MessageChannel`'s ports across worker boundaries just like
    any other `MessagePort`. Send one to the worker you want to communicate with
    synchronously.
 
 3. Once you're ready to start sending and receiving messages, wrap *both* ports
-   in `new SyncMessagePort()`, even if one is only ever going to be sending
+   in [`new SyncMessagePort()`], even if one is only ever going to be sending
    messages and not receiving them.
 
-4. Use `SyncMessagePort.postMessage()` to send messages and
+4. Use [`SyncMessagePort.postMessage()`] to send messages and
    `SyncMessagePort.receiveMessage()` to receive them synchronously.
+
+[`SyncMessagePort.createChannel()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#createChannel
+[`new SyncMessagePort()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#constructor
+[`SyncMessagePort.postMessage()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#postMessage
+[`SyncMessagePort.receiveMessage()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#receiveMessage
 
 ```js
 import {Worker} from 'node:worker_threads';
@@ -111,7 +120,7 @@ across threads when messages are available, and
 
 [`Atomics`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics
 [`SharedArrayBuffer`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer
-[`Worker.receiveMessageOnPort()`]: https://nodejs.org/api/worker_threads.html#workerreceivemessageonportport
+[`worker_threads.receiveMessageOnPort()`]: https://nodejs.org/api/worker_threads.html#workerreceivemessageonportport
 
 ### Can I use this in a browser?
 
