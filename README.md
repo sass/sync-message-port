@@ -18,7 +18,7 @@ action.
 
 ## Usage
 
-1. Use [`SyncMessagePort.createChanenl()`] to create a message channel that's
+1. Use [`SyncMessagePort.createChannel()`] to create a message channel that's
    set up to be compatible with `SyncMessagePort`s. A normal `MessageChannel`
    won't work!
 
@@ -33,7 +33,7 @@ action.
 4. Use [`SyncMessagePort.postMessage()`] to send messages and
    `SyncMessagePort.receiveMessage()` to receive them synchronously.
 
-[`SyncMessagePort.createChanenl()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#createChannel
+[`SyncMessagePort.createChannel()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#createChannel
 [`new SyncMessagePort()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#constructor
 [`SyncMessagePort.postMessage()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#postMessage
 [`SyncMessagePort.receiveMessage()`]: https://sass.github.io/sync-message-port/classes/SyncMessagePort.html#receiveMessage
