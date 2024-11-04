@@ -111,7 +111,7 @@ across threads when messages are available, and
 
 [`Atomics`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics
 [`SharedArrayBuffer`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer
-[`Worker.receiveMessageOnPort()`]: https://nodejs.org/api/worker_threads.html#workerreceivemessageonportport
+[`worker_threads.receiveMessageOnPort()`]: https://nodejs.org/api/worker_threads.html#workerreceivemessageonportport
 
 ### Can I use this in a browser?
 
