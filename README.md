@@ -40,7 +40,7 @@ action.
 
 ```js
 import {Worker} from 'node:worker_threads';
-import {SyncMessagePort} from 'sync-message-port;
+import {SyncMessagePort} from 'sync-message-port';
 // or
 // const {SyncMessagePort} = require('sync-message-port');
 
@@ -50,7 +50,7 @@ const channel = SyncMessagePort.createChannel();
 const localPort = new SyncMessagePort(channel.port1);
 
 const worker = new Worker(`
-  import {workerData} = require('node:worker_threads');
+  import {workerData} from 'node:worker_threads';
   import {SyncMessagePort} from 'sync-message-port';
 
   const remotePort = new SyncMessagePort(workerData.port);
