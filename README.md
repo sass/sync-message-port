@@ -40,7 +40,7 @@ action.
 
 ```js
 import {Worker} from 'node:worker_threads';
-import {SyncMessagePort} from 'sync-message-port;
+import {SyncMessagePort} from 'sync-message-port';
 // or
 // const {SyncMessagePort} = require('sync-message-port');
 
