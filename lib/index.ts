@@ -7,7 +7,7 @@ import {EventEmitter} from 'events';
 import {
   MessageChannel,
   MessagePort,
-  TransferListItem,
+  Transferable,
   receiveMessageOnPort,
 } from 'worker_threads';
 
@@ -126,7 +126,8 @@ export class SyncMessagePort extends EventEmitter {
   }
 
   /** See `MessagePort.postMesage()`. */
-  postMessage(value: unknown, transferList?: TransferListItem[]): void {
+  postMessage(value: unknown, transferList?: Transferable[]): void {
+    // @ts-expect-error: TypeScript gets confused with the overloads.
     this.port.postMessage(value, transferList);
 
     // If the other port is waiting for a new message, notify it that the
