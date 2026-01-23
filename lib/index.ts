@@ -2,7 +2,6 @@
 // MIT-style license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT.
 
-import {strict as assert} from 'assert';
 import {EventEmitter} from 'events';
 import {
   MessageChannel,
@@ -12,28 +11,70 @@ import {
 } from 'worker_threads';
 
 /**
- * An enum of possible states for the shared buffer that two `SyncMessagePort`s
- * use to communicate.
+ * An atomic BigInt64 counter.
  */
-enum BufferState {
+class BigInt64Counter {
   /**
-   * The initial state. When an endpoint is ready to receive messages, it'll set
-   * the buffer to this state so that it can use `Atomics.wait()` to be notified
-   * when it switches to `MessageSent`.
+   * The underlying BigInt64Array.
+   *
+   * The first BigInt64 is used to track the current number.
+   * The second BigInt64 is used to track the closed state.
    */
-  AwaitingMessage = 0b00,
+  private readonly buffer: BigInt64Array;
+
+  constructor(buffer: SharedArrayBuffer) {
+    if (buffer.byteLength !== 16) {
+      throw new Error('SharedArrayBuffer must have a byteLength of 16.');
+    }
+    this.buffer = new BigInt64Array(buffer);
+  }
+
   /**
-   * The state indicating that a message has been sent. Whenever an endpoint
-   * sends a message, it'll set the buffer to this state so that the other
-   * endpoint's `Atomics.wait()` call terminates.
+   * Atomically decrements by one the current value.
    */
-  MessageSent = 0b01,
+  decrement(): void {
+    Atomics.sub(this.buffer, 0, 1n);
+  }
+
   /**
-   * The bitmask indicating that the channel has been closed. This is masked on
-   * top of AwaitingMessage and MessageSent state. It never transitions to any
-   * other states once closed.
+   * Atomically increments by one the current value.
    */
-  Closed = 0b10,
+  increment(): void {
+    if (Atomics.add(this.buffer, 0, 1n) === 0n) {
+      Atomics.notify(this.buffer, 0, 1);
+    }
+  }
+
+  /**
+   * Closes the counter.
+   */
+  close(): void {
+    // The current value is no longer relevant once closed, therefore set it to
+    // non-zero to prevent a potential deadlock when `Atomics.notify` is called
+    // immediately before `Atomics.wait`.
+    if (
+      Atomics.compareExchange(this.buffer, 1, 0n, 1n) === 0n &&
+      Atomics.compareExchange(this.buffer, 0, 0n, 1n) === 0n
+    ) {
+      Atomics.notify(this.buffer, 0);
+    }
+  }
+
+  /**
+   * Waits until the current value is not zero or the counter is closed.
+   */
+  wait(timeout?: number): 'ok' | 'not-equal' | 'timed-out' {
+    while (
+      Atomics.load(this.buffer, 0) === 0n &&
+      Atomics.load(this.buffer, 1) === 0n
+    ) {
+      const result = Atomics.wait(this.buffer, 0, 0n, timeout);
+      if (result !== 'ok') {
+        return result;
+      }
+    }
+    return 'ok';
+  }
 }
 
 /**
@@ -80,8 +121,8 @@ export class SyncMessagePort extends EventEmitter {
   /** Creates a channel whose ports can be passed to `new SyncMessagePort()`. */
   static createChannel(): MessageChannel {
     const channel = new MessageChannel();
-    // Four bytes is the minimum necessary to use `Atomics.wait()`.
-    const buffer = new SharedArrayBuffer(4);
+    // 16 bytes is required for `BigInt64Counter`.
+    const buffer = new SharedArrayBuffer(16);
 
     // Queue up messages on each port so the caller doesn't have to explicitly
     // pass the buffer around along with them.
@@ -91,14 +132,9 @@ export class SyncMessagePort extends EventEmitter {
   }
 
   /**
-   * An Int32 view of the shared buffer.
-   *
-   * Each port sets this to `BufferState.AwaitingMessage` before checking for
-   * new messages in `receiveMessage()`, and each port sets it to
-   * `BufferState.MessageSent` after sending a new message. It's set to
-   * `BufferState.Closed` when the channel is closed.
+   * An atomic message counter shared across the port sets.
    */
-  private readonly buffer: Int32Array;
+  private readonly counter: BigInt64Counter;
 
   /**
    * Creates a new message port. The `port` must be created by
@@ -115,34 +151,32 @@ export class SyncMessagePort extends EventEmitter {
           'SyncMessagePort.createChannel().',
       );
     }
-    this.buffer = new Int32Array(buffer as SharedArrayBuffer);
+    this.counter = new BigInt64Counter(buffer as SharedArrayBuffer);
 
+    const decrement = (): void => {
+      this.counter.wait();
+      this.counter.decrement();
+    };
+    this.port.on('messageerror', decrement);
     this.on('newListener', (event, listener) => {
+      if (event === 'message' && !this.listenerCount(event)) {
+        this.port.on(event, decrement);
+      }
       this.port.on(event, listener);
     });
-    this.on('removeListener', (event, listener) =>
-      this.port.removeListener(event, listener),
-    );
+    this.on('removeListener', (event, listener) => {
+      this.port.removeListener(event, listener);
+      if (event === 'message' && !this.listenerCount(event)) {
+        this.port.removeListener(event, decrement);
+      }
+    });
   }
 
   /** See `MessagePort.postMesage()`. */
   postMessage(value: unknown, transferList?: Transferable[]): void {
     // @ts-expect-error: TypeScript gets confused with the overloads.
     this.port.postMessage(value, transferList);
-
-    // If the other port is waiting for a new message, notify it that the
-    // message is ready. Use `Atomics.compareExchange` so that we don't
-    // overwrite the "closed" state.
-    if (
-      Atomics.compareExchange(
-        this.buffer,
-        0,
-        BufferState.AwaitingMessage,
-        BufferState.MessageSent,
-      ) === BufferState.AwaitingMessage
-    ) {
-      Atomics.notify(this.buffer, 0);
-    }
+    this.counter.increment();
   }
 
   /**
@@ -151,85 +185,46 @@ export class SyncMessagePort extends EventEmitter {
    * available. In order to distinguish between a message with value `undefined`
    * and no message, a message is return in an object with a `message` field.
    *
-   * This may not be called while this has a listener for the `'message'` event.
    * It does *not* throw an error if the port is closed when this is called;
    * instead, it just returns `undefined`.
    */
   receiveMessageIfAvailable(): {message: unknown} | undefined {
-    if (this.listenerCount('message')) {
-      throw new Error(
-        'SyncMessageChannel.receiveMessageIfAvailable() may not be called ' +
-          'while there are message listeners.',
-      );
+    const message = receiveMessageOnPort(this.port);
+    if (message) {
+      this.counter.wait();
+      this.counter.decrement();
     }
-
-    return receiveMessageOnPort(this.port);
+    return message;
   }
 
   /**
    * Blocks and returns the next message sent by the other port.
    *
-   * This may not be called while this has a listener for the `'message'` event.
-   * Throws an error if the channel is closed, including if it closes while this
-   * is waiting for a message, unless {@link ReceiveMessageOptions.closedValue}
-   * is passed.
+   * Throws an error if the channel is closed and all messages are drained,
+   * including if it closes while this is waiting for a message, unless
+   * {@link ReceiveMessageOptions.closedValue} is passed.
    */
   receiveMessage(options?: ReceiveMessageOptions): unknown {
-    if (this.listenerCount('message')) {
-      throw new Error(
-        'SyncMessageChannel.receiveMessage() may not be called while there ' +
-          'are message listeners.',
-      );
-    }
-
-    // Set the "new message" indicator to zero before we check for new messages.
-    // That way if the other port sets it to 1 between the call to
-    // `receiveMessageOnPort` and the call to `Atomics.wait()`, we won't
-    // overwrite it. Use `Atomics.compareExchange` so that we don't overwrite
-    // the "closed" state.
-    const previousState = Atomics.compareExchange(
-      this.buffer,
-      0,
-      BufferState.MessageSent,
-      BufferState.AwaitingMessage,
-    );
-    if (previousState === BufferState.Closed) {
-      if (options && 'closedValue' in options) return options.closedValue;
-      throw new Error("The SyncMessagePort's channel is closed.");
-    }
-
-    let message = receiveMessageOnPort(this.port);
-    if (message) return message.message;
-
-    // If there's no new message, wait for the other port to flip the "new
-    // message" indicator to 1. If it's been set to 1 since we stored 0, this
-    // will terminate immediately.
-    const result = Atomics.wait(
-      this.buffer,
-      0,
-      BufferState.AwaitingMessage,
-      options?.timeout,
-    );
-    message = receiveMessageOnPort(this.port);
-    if (message) return message.message;
-
+    const result = this.counter.wait(options?.timeout);
     if (result === 'timed-out') {
       if ('timeoutValue' in options!) return options.timeoutValue;
       throw new TimeoutException('SyncMessagePort.receiveMessage() timed out.');
     }
 
-    // Update the state to 0b10 after the last message is consumed.
-    const oldState = Atomics.and(this.buffer, 0, BufferState.Closed);
-    // Assert the old state was either 0b10 or 0b11.
-    assert.equal(oldState & BufferState.Closed, BufferState.Closed);
+    const message = receiveMessageOnPort(this.port);
+    if (message) {
+      this.counter.decrement();
+      return message.message;
+    }
+
+    // The port is closed and all remaining messages are drained.
     if (options && 'closedValue' in options) return options.closedValue;
     throw new Error("The SyncMessagePort's channel is closed.");
   }
 
   /** See `MessagePort.close()`. */
   close(): void {
-    Atomics.or(this.buffer, 0, BufferState.Closed);
-    Atomics.notify(this.buffer, 0);
     this.port.close();
+    this.counter.close();
   }
 }

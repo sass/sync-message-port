@@ -71,6 +71,31 @@ describe('SyncMessagePort', () => {
       expect(port.receiveMessage()).toEqual('done!');
       expect(() => port.receiveMessage()).toThrow();
     });
+
+    it('multiple times and close without race condition', () => {
+      const iterations = 10;
+      for (let i = 0; i < iterations; i++) {
+        const messages = i * 1000;
+        const channel = SyncMessagePort.createChannel();
+        const port = new SyncMessagePort(channel.port1);
+
+        spawnWorker(
+          `
+          for (let i = 0; i < ${messages}; i++) {
+            port.postMessage(i);
+          }
+          port.close();
+        `,
+          channel.port2,
+        );
+
+        for (let j = 0; j < messages; j++) {
+          expect(port.receiveMessage()).toEqual(j);
+        }
+        expect(() => port.receiveMessage()).toThrow();
+        port.close();
+      }
+    });
   });
 
   describe('receiveMessageIfAvailable()', () => {
@@ -122,7 +147,12 @@ describe('SyncMessagePort', () => {
       );
 
       expect(port.receiveMessage()).toEqual('first');
-      expect(port.receiveMessageIfAvailable()?.message).toEqual('second');
+      // Worker thread can be slow that the result is not deterministic
+      let message;
+      while (message === undefined) {
+        message = port.receiveMessageIfAvailable();
+      }
+      expect(message.message).toEqual('second');
       expect(port.receiveMessage()).toEqual('third');
     });
   });
@@ -223,11 +253,39 @@ describe('SyncMessagePort', () => {
       port1.close();
     });
 
-    it('receiveMessage() throws an error after listening', async () => {
+    it('receiveMessage() receives a message after listening', () => {
       const channel = SyncMessagePort.createChannel();
       const port1 = new SyncMessagePort(channel.port1);
+      spawnWorker(
+        `
+          setTimeout(() => {
+            port.postMessage('hi there!');
+          }, 100);
+        `,
+        channel.port2,
+      );
       port1.on('message', () => {});
+      expect(port1.receiveMessage()).toEqual('hi there!');
+      port1.close();
+    });
 
+    it('receives a message after listening after receiveMessage()', async () => {
+      const channel = SyncMessagePort.createChannel();
+      const port1 = new SyncMessagePort(channel.port1);
+      const promise = new Promise(resolve => port1.once('message', resolve));
+
+      spawnWorker(
+        `
+          setTimeout(() => {
+            port.postMessage('first');
+            port.postMessage('second');
+            port.close()
+          }, 100);
+        `,
+        channel.port2,
+      );
+      expect(port1.receiveMessage()).toEqual('first');
+      await expect(promise).resolves.toEqual('second');
       expect(() => port1.receiveMessage()).toThrow();
       port1.close();
     });
