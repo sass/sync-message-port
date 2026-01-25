@@ -36,7 +36,7 @@ describe('SyncMessagePort', () => {
       );
 
       expect(port.receiveMessage()).toEqual('done!');
-      expect(port.receiveMessage).toThrow();
+      expect(() => port.receiveMessage()).toThrow();
     });
 
     it('multiple times before the other endpoint starts reading', () => {
@@ -69,7 +69,7 @@ describe('SyncMessagePort', () => {
 
       expect(port.receiveMessage()).toEqual('message1');
       expect(port.receiveMessage()).toEqual('done!');
-      expect(port.receiveMessage).toThrow();
+      expect(() => port.receiveMessage()).toThrow();
     });
   });
 
@@ -228,7 +228,7 @@ describe('SyncMessagePort', () => {
       const port1 = new SyncMessagePort(channel.port1);
       port1.on('message', () => {});
 
-      expect(port1.receiveMessage).toThrow();
+      expect(() => port1.receiveMessage()).toThrow();
       port1.close();
     });
   });
@@ -251,8 +251,8 @@ describe('SyncMessagePort', () => {
       const port2 = new SyncMessagePort(channel.port2);
 
       port1.close();
-      expect(port1.receiveMessage).toThrow();
-      expect(port2.receiveMessage).toThrow();
+      expect(() => port1.receiveMessage()).toThrow();
+      expect(() => port2.receiveMessage()).toThrow();
     });
 
     it('receiveMessage() throws an error when a port closes', () => {
@@ -268,7 +268,7 @@ describe('SyncMessagePort', () => {
         channel.port2,
       );
 
-      expect(port.receiveMessage).toThrow();
+      expect(() => port.receiveMessage()).toThrow();
     });
 
     it(
