@@ -122,19 +122,27 @@ export class SyncMessagePort extends EventEmitter {
   static createChannel(): MessageChannel {
     const channel = new MessageChannel();
     // 16 bytes is required for `BigInt64Counter`.
-    const buffer = new SharedArrayBuffer(16);
+    const buffer1 = new SharedArrayBuffer(16);
+    const buffer2 = new SharedArrayBuffer(16);
 
     // Queue up messages on each port so the caller doesn't have to explicitly
     // pass the buffer around along with them.
-    channel.port1.postMessage(buffer);
-    channel.port2.postMessage(buffer);
+    channel.port1.postMessage(buffer1);
+    channel.port1.postMessage(buffer2);
+    channel.port2.postMessage(buffer2);
+    channel.port2.postMessage(buffer1);
     return channel;
   }
 
   /**
-   * An atomic message counter shared across the port sets.
+   * An atomic counter of messages posted yet to be received.
    */
-  private readonly counter: BigInt64Counter;
+  private readonly postCounter: BigInt64Counter;
+
+  /**
+   * An atomic counter of messages available to be received.
+   */
+  private readonly receiveCounter: BigInt64Counter;
 
   /**
    * Creates a new message port. The `port` must be created by
@@ -144,18 +152,20 @@ export class SyncMessagePort extends EventEmitter {
   constructor(private readonly port: MessagePort) {
     super();
 
-    const buffer = receiveMessageOnPort(this.port)?.message;
-    if (!buffer) {
+    const buffer1 = receiveMessageOnPort(this.port)?.message;
+    const buffer2 = receiveMessageOnPort(this.port)?.message;
+    if (!buffer1 || !buffer2) {
       throw new Error(
         'new SyncMessagePort() must be passed a port from ' +
           'SyncMessagePort.createChannel().',
       );
     }
-    this.counter = new BigInt64Counter(buffer as SharedArrayBuffer);
+    this.postCounter = new BigInt64Counter(buffer1 as SharedArrayBuffer);
+    this.receiveCounter = new BigInt64Counter(buffer2 as SharedArrayBuffer);
 
     const decrement = (): void => {
-      this.counter.wait();
-      this.counter.decrement();
+      this.receiveCounter.wait();
+      this.receiveCounter.decrement();
     };
     this.port.on('messageerror', decrement);
     this.on('newListener', (event, listener) => {
@@ -176,7 +186,7 @@ export class SyncMessagePort extends EventEmitter {
   postMessage(value: unknown, transferList?: Transferable[]): void {
     // @ts-expect-error: TypeScript gets confused with the overloads.
     this.port.postMessage(value, transferList);
-    this.counter.increment();
+    this.postCounter.increment();
   }
 
   /**
@@ -191,8 +201,8 @@ export class SyncMessagePort extends EventEmitter {
   receiveMessageIfAvailable(): {message: unknown} | undefined {
     const message = receiveMessageOnPort(this.port);
     if (message) {
-      this.counter.wait();
-      this.counter.decrement();
+      this.receiveCounter.wait();
+      this.receiveCounter.decrement();
     }
     return message;
   }
@@ -205,7 +215,7 @@ export class SyncMessagePort extends EventEmitter {
    * {@link ReceiveMessageOptions.closedValue} is passed.
    */
   receiveMessage(options?: ReceiveMessageOptions): unknown {
-    const result = this.counter.wait(options?.timeout);
+    const result = this.receiveCounter.wait(options?.timeout);
     if (result === 'timed-out') {
       if ('timeoutValue' in options!) return options.timeoutValue;
       throw new TimeoutException('SyncMessagePort.receiveMessage() timed out.');
@@ -213,7 +223,7 @@ export class SyncMessagePort extends EventEmitter {
 
     const message = receiveMessageOnPort(this.port);
     if (message) {
-      this.counter.decrement();
+      this.receiveCounter.decrement();
       return message.message;
     }
 
@@ -225,6 +235,7 @@ export class SyncMessagePort extends EventEmitter {
   /** See `MessagePort.close()`. */
   close(): void {
     this.port.close();
-    this.counter.close();
+    this.postCounter.close();
+    this.receiveCounter.close();
   }
 }

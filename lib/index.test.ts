@@ -98,6 +98,30 @@ describe('SyncMessagePort', () => {
     });
   });
 
+  describe('supports two-way blocking communications', () => {
+    it('receiveMessage() on both ports', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+
+      spawnWorker(
+        `
+        for (let i = 0; i < 50; i++) {
+          port.postMessage(port.receiveMessage() + 1);
+        }
+        port.postMessage(port.receiveMessage());
+        port.close();
+      `,
+        channel.port2,
+      );
+      port.postMessage(0);
+      for (let i = 0; i < 50; i++) {
+        port.postMessage((port.receiveMessage() as number) + 1);
+      }
+      expect(port.receiveMessage()).toEqual(100);
+      port.close();
+    });
+  });
+
   describe('receiveMessageIfAvailable()', () => {
     it('without a queued message', () => {
       const channel = SyncMessagePort.createChannel();
