@@ -169,7 +169,7 @@ describe('SyncMessagePort', () => {
       );
 
       expect(port.receiveMessage()).toEqual('first');
-      // The wWorker thread can be slow enough that the message may not be
+      // The worker thread can be slow enough that the message may not be
       // immediately available.
       let message;
       do {
