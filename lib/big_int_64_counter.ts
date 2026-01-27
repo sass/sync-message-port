@@ -35,6 +35,8 @@ export class BigInt64Counter {
 
   /**
    * Closes the counter.
+   *
+   * Atomically update the close state to one (closed) if it's zero (open).
    */
   close(): void {
     // The current value is no longer relevant once closed, therefore set it to
@@ -50,6 +52,12 @@ export class BigInt64Counter {
 
   /**
    * Waits until the current value is not zero or the counter is closed.
+   *
+   * This handles sporadic wake-ups, that the meaning of the return values are
+   * the same as `Atomics.wait` except for `'ok'`:
+   * - For `Atomics.wait`, `'ok'` is returned if woken up by a call to
+   *   `Atomics.notify()`, regardless of whether the value has changed.
+   * - For this, `'ok'` is returned only if the value has changed.
    */
   wait(timeout?: number): 'ok' | 'not-equal' | 'timed-out' {
     while (
