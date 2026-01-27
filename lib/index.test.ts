@@ -252,10 +252,6 @@ describe('SyncMessagePort', () => {
 
       const port2 = new SyncMessagePort(channel.port2);
 
-      // Wait a macrotask to make sure the message is as queued up as it's going
-      // to be.
-      await new Promise(process.nextTick);
-
       const promise = new Promise(resolve => port2.once('message', resolve));
       await expect(promise).resolves.toEqual('hi there!');
       port1.close();
@@ -266,9 +262,6 @@ describe('SyncMessagePort', () => {
       const port1 = new SyncMessagePort(channel.port1);
       const promise = new Promise(resolve => port1.once('message', resolve));
 
-      // Wait a macrotask to make sure the message is as queued up as it's going
-      // to be.
-      await new Promise(process.nextTick);
       const port2 = new SyncMessagePort(channel.port2);
       port2.postMessage('hi there!');
 
@@ -276,20 +269,26 @@ describe('SyncMessagePort', () => {
       port1.close();
     });
 
-    it('receiveMessage() receives a message after listening', () => {
+    it('receiveMessage() receives a message after removing listener', async () => {
       const channel = SyncMessagePort.createChannel();
-      const port1 = new SyncMessagePort(channel.port1);
+      const port = new SyncMessagePort(channel.port1);
+      const promise = new Promise(resolve => port.once('message', resolve));
       spawnWorker(
         `
           setTimeout(() => {
-            port.postMessage('hi there!');
+            port.postMessage('first');
+            setTimeout(() => {
+              port.postMessage('second');
+              port.close();
+            }, 100);
           }, 100);
         `,
         channel.port2,
       );
-      port1.on('message', () => {});
-      expect(port1.receiveMessage()).toEqual('hi there!');
-      port1.close();
+
+      await expect(promise).resolves.toEqual('first');
+      expect(port.receiveMessage()).toEqual('second');
+      expect(() => port.receiveMessage()).toThrow();
     });
 
     it('receives a message after listening after receiveMessage()', async () => {
