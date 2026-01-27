@@ -25,13 +25,13 @@ describe('SyncMessagePort', () => {
 
       spawnWorker(
         `
-        // Wait a little bit just to make entirely sure that the parent thread
-        // is awaiting a message.
-        setTimeout(() => {
-          port.postMessage('done!');
-          port.close();
-        }, 100);
-      `,
+          // Wait a little bit just to make entirely sure that the parent thread
+          // is awaiting a message.
+          setTimeout(() => {
+            port.postMessage('done!');
+            port.close();
+          }, 100);
+        `,
         channel.port2,
       );
 
@@ -54,16 +54,16 @@ describe('SyncMessagePort', () => {
       expect(port2.receiveMessage()).toEqual('message4');
     });
 
-    it('multiple times and close', () => {
+    it('multiple times and closes', () => {
       const channel = SyncMessagePort.createChannel();
       const port = new SyncMessagePort(channel.port1);
 
       spawnWorker(
         `
-        port.postMessage('message1');
-        port.postMessage('done!');
-        port.close();
-      `,
+          port.postMessage('message1');
+          port.postMessage('done!');
+          port.close();
+        `,
         channel.port2,
       );
 
@@ -72,7 +72,7 @@ describe('SyncMessagePort', () => {
       expect(() => port.receiveMessage()).toThrow();
     });
 
-    it('multiple times and close without race condition', () => {
+    it('multiple times and closes without race condition', () => {
       const iterations = 10;
       for (let i = 0; i < iterations; i++) {
         const messages = i * 1000;
@@ -81,11 +81,11 @@ describe('SyncMessagePort', () => {
 
         spawnWorker(
           `
-          for (let i = 0; i < ${messages}; i++) {
-            port.postMessage(i);
-          }
-          port.close();
-        `,
+            for (let i = 0; i < ${messages}; i++) {
+              port.postMessage(i);
+            }
+            port.close();
+          `,
           channel.port2,
         );
 
@@ -105,12 +105,12 @@ describe('SyncMessagePort', () => {
 
       spawnWorker(
         `
-        for (let i = 0; i < 50; i++) {
-          port.postMessage(port.receiveMessage() + 1);
-        }
-        port.postMessage(port.receiveMessage());
-        port.close();
-      `,
+          for (let i = 0; i < 50; i++) {
+            port.postMessage(port.receiveMessage() + 1);
+          }
+          port.postMessage(port.receiveMessage());
+          port.close();
+        `,
         channel.port2,
       );
       port.postMessage(0);
@@ -149,33 +149,34 @@ describe('SyncMessagePort', () => {
       expect(port2.receiveMessageIfAvailable()).toBe(undefined);
     });
 
-    it('bewteen receiving blocking messages', () => {
+    it('between receiving blocking messages', () => {
       const channel = SyncMessagePort.createChannel();
       const port = new SyncMessagePort(channel.port1);
 
       spawnWorker(
         `
-        // Wait a little bit just to make entirely sure that the parent thread
-        // is awaiting a message.
-        setTimeout(() => {
-          port.postMessage('first');
-          port.postMessage('second');
-
+          // Wait a little bit just to make entirely sure that the parent thread
+          // is awaiting a message.
           setTimeout(() => {
-            port.postMessage('third');
-            port.close();
+            port.postMessage('first');
+            port.postMessage('second');
+
+            setTimeout(() => {
+              port.postMessage('third');
+              port.close();
+            }, 100);
           }, 100);
-        }, 100);
-      `,
+        `,
         channel.port2,
       );
 
       expect(port.receiveMessage()).toEqual('first');
-      // Worker thread can be slow that the result is not deterministic
+      // The wWorker thread can be slow enough that the message may not be
+      // immediately available.
       let message;
-      while (message === undefined) {
+      do {
         message = port.receiveMessageIfAvailable();
-      }
+      } while (message === undefined);
       expect(message.message).toEqual('second');
       expect(port.receiveMessage()).toEqual('third');
     });
@@ -397,15 +398,15 @@ function spawnWorker(source: string, port: MessagePort): Worker {
   fs.writeFileSync(
     file,
     `
-    const {SyncMessagePort} = require(${JSON.stringify(
-      p.join(p.dirname(__filename), 'index'),
-    )});
-    const {workerData} = require('worker_threads');
+      const {SyncMessagePort} = require(${JSON.stringify(
+        p.join(p.dirname(__filename), 'index'),
+      )});
+      const {workerData} = require('worker_threads');
 
-    const port = new SyncMessagePort(workerData);
+      const port = new SyncMessagePort(workerData);
 
-    ${source}
-  `,
+      ${source}
+    `,
   );
 
   const worker = new Worker(
