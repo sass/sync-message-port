@@ -291,6 +291,34 @@ describe('SyncMessagePort', () => {
       expect(() => port.receiveMessage()).toThrow();
     });
 
+    it('receiveMessage() receives a message inside listener', async () => {
+      const channel = SyncMessagePort.createChannel();
+      const port = new SyncMessagePort(channel.port1);
+      const promise = new Promise(resolve =>
+        port.on('message', message => {
+          port.postMessage('ping');
+          expect(port.receiveMessage()).toEqual('pong');
+          resolve(message);
+        }),
+      );
+
+      spawnWorker(
+        `
+          setTimeout(() => {
+            port.postMessage('hello');
+            setTimeout(() => {
+              port.postMessage(port.receiveMessage().replace('i', 'o'));
+              port.close();
+            }, 100);
+          }, 100);
+        `,
+        channel.port2,
+      );
+
+      await expect(promise).resolves.toEqual('hello');
+      expect(() => port.receiveMessage()).toThrow();
+    });
+
     it('receives a message after listening after receiveMessage()', async () => {
       const channel = SyncMessagePort.createChannel();
       const port1 = new SyncMessagePort(channel.port1);
