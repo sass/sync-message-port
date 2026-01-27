@@ -154,8 +154,7 @@ export class SyncMessagePort extends EventEmitter {
    * {@link ReceiveMessageOptions.closedValue} is passed.
    */
   receiveMessage(options?: ReceiveMessageOptions): unknown {
-    const result = this.receiveCounter.wait(options?.timeout);
-    if (result === 'timed-out') {
+    if (!this.receiveCounter.wait(options?.timeout)) {
       if ('timeoutValue' in options!) return options.timeoutValue;
       throw new TimeoutException('SyncMessagePort.receiveMessage() timed out.');
     }

@@ -53,22 +53,23 @@ export class BigInt64Counter {
   /**
    * Waits until the current value is not zero or the counter is closed.
    *
-   * This handles sporadic wake-ups, that the meaning of the return values are
-   * the same as `Atomics.wait` except for `'ok'`:
-   * - For `Atomics.wait`, `'ok'` is returned if woken up by a call to
-   *   `Atomics.notify()`, regardless of whether the value has changed.
-   * - For this, `'ok'` is returned only if the value has changed.
+   * `true` is returned if the condition has been met with or without waiting.
+   * This handles sporadic wake-ups that it would wait indefinitely until the
+   * condition has been met, unless a timeout is specified.
+   *
+   * `false` is returned if the condition has not been met after the specified
+   * timeout.
    */
-  wait(timeout?: number): 'ok' | 'not-equal' | 'timed-out' {
+  wait(timeout?: number): boolean {
     while (
       Atomics.load(this.buffer, 0) === 0n &&
       Atomics.load(this.buffer, 1) === 0n
     ) {
       const result = Atomics.wait(this.buffer, 0, 0n, timeout);
       if (result !== 'ok') {
-        return result;
+        return result !== 'timed-out';
       }
     }
-    return 'ok';
+    return true;
   }
 }
