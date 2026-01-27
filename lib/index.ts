@@ -97,21 +97,26 @@ export class SyncMessagePort extends EventEmitter {
     this.postCounter = new BigInt64Counter(buffer1 as SharedArrayBuffer);
     this.receiveCounter = new BigInt64Counter(buffer2 as SharedArrayBuffer);
 
-    const decrement = (): void => {
+    const messageHandler = (): void => {
       this.receiveCounter.wait();
       this.receiveCounter.decrement();
     };
-    this.port.on('messageerror', decrement);
+    this.port.on('messageerror', (error: Error): void => {
+      messageHandler();
+      if (!this.listenerCount('messageerror')) {
+        throw error;
+      }
+    });
     this.on('newListener', (event, listener) => {
       if (event === 'message' && !this.listenerCount(event)) {
-        this.port.on(event, decrement);
+        this.port.on(event, messageHandler);
       }
       this.port.on(event, listener);
     });
     this.on('removeListener', (event, listener) => {
       this.port.removeListener(event, listener);
       if (event === 'message' && !this.listenerCount(event)) {
-        this.port.removeListener(event, decrement);
+        this.port.removeListener(event, messageHandler);
       }
     });
   }
