@@ -326,6 +326,20 @@ describe('SyncMessagePort', () => {
       await new Promise(resolve => port2.once('close', resolve));
     });
 
+    it('receiveMessage() drains multiple messages after a port closes', () => {
+      const channel = SyncMessagePort.createChannel();
+      const port1 = new SyncMessagePort(channel.port1);
+      const port2 = new SyncMessagePort(channel.port2);
+
+      port1.postMessage('first');
+      port1.postMessage('second');
+      port1.close();
+
+      expect(port2.receiveMessage()).toEqual('first');
+      expect(port2.receiveMessage()).toEqual('second');
+      expect(() => port2.receiveMessage()).toThrow();
+    });
+
     it("receiveMessage() throws an error for a port that's already closed", () => {
       const channel = SyncMessagePort.createChannel();
       const port1 = new SyncMessagePort(channel.port1);
