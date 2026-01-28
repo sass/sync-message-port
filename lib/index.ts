@@ -49,7 +49,9 @@ export class TimeoutException extends Error {
  * A communication port that can receive messages synchronously from another
  * `SyncMessagePort`.
  *
- * This also emits the same asynchronous events as `MessagePort`.
+ * This also emits the same asynchronous events as `MessagePort`. Messages are
+ * preferentially sent to {@link receiveMessage} if a call to it is outstanding,
+ * and only sent to the event handler if they weren't received synchronously.
  */
 export class SyncMessagePort extends EventEmitter {
   /** Creates a channel whose ports can be passed to `new SyncMessagePort()`. */
