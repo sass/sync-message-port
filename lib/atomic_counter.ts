@@ -1,16 +1,16 @@
 /**
- * A BigInt64 that can be atomically incremented and decremented, and which
+ * A counter that can be atomically incremented and decremented, and which
  * callers can synchronously listen for it becoming non-zero.
  *
  * This can be "open" or "closed"; once it's closed, {@link wait} will no longer
  * emit useful events.
  */
-export class BigInt64Counter {
+export class AtomicCounter {
   /**
    * The underlying BigInt64Array.
    *
-   * The first BigInt64 is used to track the current number.
-   * The second BigInt64 is used to track the closed state.
+   * The first BigInt64 represents the current value of the counter. The second
+   * BigInt64 is used to track the closed state.
    */
   private readonly buffer: BigInt64Array;
 
@@ -36,7 +36,8 @@ export class BigInt64Counter {
   /**
    * Closes the counter.
    *
-   * Atomically update the close state to one (closed) if it's zero (open).
+   * This will cause any outstanding calls to {@link wait} on any thread to
+   * return `true` immediately.
    */
   close(): void {
     // The current value is no longer relevant once closed, therefore set it to
@@ -53,12 +54,8 @@ export class BigInt64Counter {
   /**
    * Waits until the current value is not zero or the counter is closed.
    *
-   * `true` is returned if the condition has been met with or without waiting.
-   * This handles sporadic wake-ups that it would wait indefinitely until the
-   * condition has been met, unless a timeout is specified.
-   *
-   * `false` is returned if the condition has not been met after the specified
-   * timeout.
+   * Returns `true` when the counter is non-zero *or* when it's closed. Returns
+   * `false` if the counter remains zero for `timeout` milliseconds.
    */
   wait(timeout?: number): boolean {
     while (

@@ -9,7 +9,7 @@ import {
   Transferable,
   receiveMessageOnPort,
 } from 'worker_threads';
-import {BigInt64Counter} from './big_int_64_counter';
+import {AtomicCounter} from './atomic_counter';
 
 /**
  * Options that can be passed to {@link SyncMessagePort.receiveMessage}.
@@ -55,7 +55,7 @@ export class SyncMessagePort extends EventEmitter {
   /** Creates a channel whose ports can be passed to `new SyncMessagePort()`. */
   static createChannel(): MessageChannel {
     const channel = new MessageChannel();
-    // 16 bytes is required for `BigInt64Counter`.
+    // 16 bytes is required for `AtomicCounter`.
     const buffer1 = new SharedArrayBuffer(16);
     const buffer2 = new SharedArrayBuffer(16);
 
@@ -71,12 +71,12 @@ export class SyncMessagePort extends EventEmitter {
   /**
    * An atomic counter of messages posted yet to be received.
    */
-  private readonly postCounter: BigInt64Counter;
+  private readonly postCounter: AtomicCounter;
 
   /**
    * An atomic counter of messages available to be received.
    */
-  private readonly receiveCounter: BigInt64Counter;
+  private readonly receiveCounter: AtomicCounter;
 
   /**
    * Creates a new message port. The `port` must be created by
@@ -94,8 +94,8 @@ export class SyncMessagePort extends EventEmitter {
           'SyncMessagePort.createChannel().',
       );
     }
-    this.postCounter = new BigInt64Counter(buffer1 as SharedArrayBuffer);
-    this.receiveCounter = new BigInt64Counter(buffer2 as SharedArrayBuffer);
+    this.postCounter = new AtomicCounter(buffer1 as SharedArrayBuffer);
+    this.receiveCounter = new AtomicCounter(buffer2 as SharedArrayBuffer);
 
     const messageHandler = (): void => {
       this.receiveCounter.wait();
