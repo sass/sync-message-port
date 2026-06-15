@@ -5,7 +5,7 @@
     "rootDir": ".",
     "lib": ["DOM"],
     "types": ["node", "jest"],
-    "moduleResolution": "bundler",
+    "moduleResolution": "bundler"
   },
   "include": [
     "*.ts",
