@@ -12,19 +12,38 @@ on:
     tags: ['**']
   pull_request:
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static_analysis:
     name: Static analysis
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 'lts/*'
           check-latest: true
+          package-manager-cache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning] zizmorcore/zizmor#2496
       - run: npm install
       - run: npm run check
+
+  static_analysis_ci:
+    name: Static analysis (GitHub Actions)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with: {persist-credentials: false}
+    - uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+      with:
+        persona: pedantic
+        advanced-security: false # Fail the GitHub action if Zizmor has findings
 
   tests:
     name: 'Tests | Node ${{ matrix.node-version }} | ${{ matrix.os }}'
@@ -37,11 +56,13 @@ jobs:
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           check-latest: true
+          package-manager-cache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning] zizmorcore/zizmor#2496
       - run: npm install
       - run: npm run test
 
@@ -50,12 +71,11 @@ jobs:
     if: "startsWith(github.ref, 'refs/tags/') && github.repository == 'sass/sync-message-port'"
     needs: [static_analysis, tests]
     permissions:
-      attestations: write
-      contents: write
-      id-token: write
-    uses: ./.github/workflows/release.yml
+      id-token: write # Forwarded
+    uses: $/.github/workflows/release.yml
 
   typedoc:
+    name: TypeDoc
     runs-on: ubuntu-latest
     if: "startsWith(github.ref, 'refs/tags/') && github.repository == 'sass/sync-message-port'"
     needs: [deploy]
@@ -65,22 +85,24 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     permissions:
-      pages: write
-      id-token: write
+      pages: write # Publish GitHub pages
+      id-token: write # Publish GitHub pages
 
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 'lts/*'
           check-latest: true
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: ${{ !startsWith(github.ref, 'refs/tags/') }} # zizmor: ignore[cache-poisoning] zizmorcore/zizmor#2496
       - run: npm install
       - run: npm run doc
 
       - name: Upload static files as artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with: {path: docs}
 
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
